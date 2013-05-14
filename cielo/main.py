@@ -6,6 +6,10 @@ import xml.dom.minidom
 from decimal import Decimal
 from util import moneyfmt
 
+# loggers
+import logging
+logging.basicConfig(filename='cielo.log', level=logging.DEBUG)
+
 
 SANDBOX_URL = 'https://qasecommerce.cielo.com.br/servicos/ecommwsec.do'
 PRODUCTION_URL = 'https://ecommerce.cbmp.com.br/servicos/ecommwsec.do'
@@ -43,14 +47,14 @@ class PaymentAttempt(object):
     )
 
     def __init__(self, affiliation_id, api_key, total, card_type, installments, order_id, card_number, cvc2,
-                exp_month, exp_year, card_holders_name, transaction=CASH, sandbox=False):
+        exp_month, exp_year, card_holders_name, transaction=CASH, sandbox=False):
 
         assert isinstance(total, Decimal), u'total must be an instance of Decimal'
         assert installments in range(1, 13), u'installments must be a integer between 1 and 12'
 
         assert (installments == 1 and transaction == self.CASH) \
-                    or installments > 1 and transaction != self.CASH, \
-                    u'if installments = 1 then transaction must be None or "cash"'
+            or installments > 1 and transaction != self.CASH, \
+            u'if installments = 1 then transaction must be None or "cash"'
 
         if len(str(exp_year)) == 2:
             exp_year = '20%s' % exp_year  # FIXME: bug do milênio em 2100
@@ -86,9 +90,9 @@ class PaymentAttempt(object):
             error_id = dom.getElementsByTagName('autorizacao')[0].getElementsByTagName('codigo')[0].childNodes[0].data
             error_message = dom.getElementsByTagName('autorizacao')[0].getElementsByTagName('mensagem')[0].childNodes[0].data
         except:
+            logging.debug(response.content)
             error_id = None
             error_message = u'Ocorreu um erro, verifique junto a sua operadora de cartão.'
-
 
         if dom.getElementsByTagName('erro'):
             raise GetAuthorizedException(error_id, error_message)
@@ -99,7 +103,6 @@ class PaymentAttempt(object):
             # 4 = autorizado (ou captura pendente)
             self._authorized = False
             raise GetAuthorizedException(error_id, error_message)
-
 
         self.transaction_id = dom.getElementsByTagName('tid')[0].childNodes[0].data
         self.pan = dom.getElementsByTagName('pan')[0].childNodes[0].data
@@ -123,4 +126,3 @@ class PaymentAttempt(object):
             # 6 = capturado
             raise CaptureException()
         return True
-
